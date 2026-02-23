@@ -3,7 +3,7 @@
   "name": "Auto Open In Sidebar",
   "version": "1.0.0",
   "minAppVersion": "1.5.0",
-  "description": "Automatically opens selected Canvas note cards in a dedicated right-sidebar tab.",
-  "author": "sharefun",
+  "description": "Automatically opens selected Canvas or Excalidraw note in a dedicated right-sidebar tab.",
+  "author": "Hsueh-Fang Yeh",
   "isDesktopOnly": false
 }
