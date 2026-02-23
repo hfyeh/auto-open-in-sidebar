@@ -1,0 +1,9 @@
+{
+  "id": "auto-open-in-sidebar",
+  "name": "Auto Open In Sidebar",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "Automatically opens selected Canvas note cards in a dedicated right-sidebar tab.",
+  "author": "sharefun",
+  "isDesktopOnly": false
+}

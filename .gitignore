@@ -1,0 +1,22 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+main.js
+*.js.map
+data.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Local env files
+.env
+*.env.local
+
+# TypeScript
+*.tsbuildinfo
