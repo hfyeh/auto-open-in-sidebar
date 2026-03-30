@@ -23,3 +23,6 @@ Thumbs.db
 
 # Release output
 release/*
+
+# Superpowers brainstorm sessions
+.superpowers/

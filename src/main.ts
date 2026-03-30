@@ -1,4 +1,4 @@
-import { ItemView, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Plugin, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 
 interface CanvasElementLike {
   file?: TFile;
@@ -27,9 +27,21 @@ export default class AutoOpenInSidebarPlugin extends Plugin {
   private selectionCheckFrameId: number | null = null;
 
   onload(): void {
+    // Auto-update sidebar when it is already open and the user clicks another note.
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.scheduleSelectionCheck()));
     this.registerDomEvent(document, "pointerup", () => this.scheduleSelectionCheck());
     this.registerDomEvent(document, "keyup", () => this.scheduleSelectionCheck());
+
+    // Double-click on a note opens it in the sidebar even if the sidebar was closed.
+    this.registerDomEvent(document, "dblclick", () => this.handleDoubleClick());
+
+    // Canvas right-click node menu.
+    this.registerEvent(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.app.workspace as any).on("canvas:node-menu", (menu: Menu, node: CanvasElementLike) => {
+        this.addCanvasNodeMenuItem(menu, node);
+      })
+    );
   }
 
   onunload(): void {
@@ -52,6 +64,26 @@ export default class AutoOpenInSidebarPlugin extends Plugin {
       this.selectionCheckQueued = false;
       this.selectionCheckFrameId = null;
       void this.syncSelectedFileToSidebar();
+    });
+  }
+
+  private handleDoubleClick(): void {
+    const file = this.getSelectedMarkdownFileFromCanvas() ?? this.getSelectedMarkdownFileFromExcalidraw();
+    if (file) {
+      void this.openFileInSidebar(file);
+    }
+  }
+
+  private addCanvasNodeMenuItem(menu: Menu, node: CanvasElementLike): void {
+    const file = node.file;
+    if (!(file instanceof TFile) || file.extension !== "md") return;
+    if (node.getData?.().type !== "file") return;
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Open in sidebar")
+        .setIcon("panel-right")
+        .onClick(() => void this.openFileInSidebar(file));
     });
   }
 
@@ -113,9 +145,6 @@ export default class AutoOpenInSidebarPlugin extends Plugin {
     }
 
     const link = selectedElement.link;
-    if (!link) {
-      return null;
-    }
 
     // Handle Obsidian links like [[Filename]], [[Filename#Section]], [[Filename|Alias]]
     const match = link.match(/^\[\[([^\]|#]+)(?:[\]|#|])/);
@@ -147,26 +176,45 @@ export default class AutoOpenInSidebarPlugin extends Plugin {
       return this.sidebarLeaf;
     }
 
-    const leaf = this.app.workspace.getRightLeaf(true);
+    // getRightLeaf(false) reuses an existing right sidebar leaf without creating a split.
+    // Fall back to getRightLeaf(true) only when the sidebar has no leaves at all.
+    const leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getRightLeaf(true);
     this.sidebarLeaf = leaf;
     return leaf;
   }
 
+  private setSidebarLeafIcon(leaf: WorkspaceLeaf): void {
+    // Override getIcon so the book icon persists across Obsidian's tab re-renders.
+    leaf.view.getIcon = () => "book-open";
+
+    // Also apply directly to the DOM right now.
+    const tabHeaderEl = (leaf as WorkspaceLeaf & { tabHeaderEl?: HTMLElement }).tabHeaderEl;
+    const iconEl = tabHeaderEl?.querySelector<HTMLElement>(".workspace-tab-header-inner-icon");
+    if (iconEl) {
+      setIcon(iconEl, "book-open");
+    }
+  }
+
+  // Auto-update: only runs when the sidebar tab is already open.
   private async syncSelectedFileToSidebar(): Promise<void> {
-    const selectedFile = this.getSelectedMarkdownFileFromCanvas() || this.getSelectedMarkdownFileFromExcalidraw();
-    if (!selectedFile) {
+    if (!this.isLeafUsable(this.sidebarLeaf)) {
       return;
     }
 
-    if (this.isSidebarLeafAlreadyShowing(selectedFile)) {
+    const selectedFile = this.getSelectedMarkdownFileFromCanvas() ?? this.getSelectedMarkdownFileFromExcalidraw();
+    if (!selectedFile || this.isSidebarLeafAlreadyShowing(selectedFile)) {
       return;
     }
 
+    await this.openFileInSidebar(selectedFile);
+  }
+
+  private async openFileInSidebar(file: TFile): Promise<void> {
     const leaf = this.ensureSidebarLeaf();
-    if (!leaf) {
-      return;
-    }
+    if (!leaf) return;
 
-    await leaf.openFile(selectedFile, { active: false });
+    await leaf.openFile(file, { active: false });
+    this.app.workspace.revealLeaf(leaf);
+    this.setSidebarLeafIcon(leaf);
   }
 }
